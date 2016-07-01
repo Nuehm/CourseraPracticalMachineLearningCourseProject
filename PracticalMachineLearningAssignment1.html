@@ -230,7 +230,7 @@ pred3 &lt;- predict(mod3, Testing)
 acc3 &lt;- confusionMatrix(pred3, Testing$classe)$overall['Accuracy']</code></pre>
 <pre class="r"><code>t4 &lt;- Sys.time()
 t4 - t3</code></pre>
-<pre><code>## Time difference of 1.152626 hours</code></pre>
+<pre><code>## Time difference of 0.03999996 secs</code></pre>
 <p>The following table compares the accuracy of the three models:</p>
 <pre class="r"><code>model &lt;- rbind(&quot;rf&quot;, &quot;rpart&quot;, &quot;lda&quot;)
 accuracy &lt;- round(100*rbind(acc1, acc2, acc3), 2)
@@ -280,8 +280,12 @@ print(model_results, row.names = FALSE)</code></pre>
 ## Detection Prevalence   0.2851   0.1929   0.1757   0.1626   0.1837
 ## Balanced Accuracy      0.9991   0.9966   0.9974   0.9951   0.9990</code></pre>
 </div>
+<div id="out-of-sample-error" class="section level3">
+<h3>4.3 Out of Sample Error</h3>
+<p>The Out Of Sample Error is given by 100% - 99.6261682% = 0.3738318%. The model is thus properly performing on the test set.</p>
+</div>
 <div id="predicting-on-the-test-set" class="section level3">
-<h3>4.3 Predicting on the Test Set</h3>
+<h3>4.4 Predicting on the Test Set</h3>
 <p>In the last step the random forest model is used to predict on the test set (testing):</p>
 <pre class="r"><code>predict(mod1, testing)</code></pre>
 <pre><code>##  [1] B A B A A E D B A A B C B A E E A B B B

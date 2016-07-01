@@ -213,8 +213,12 @@ The confusion matrix is shown below:
 print(confusionMatrix(pred1, Testing$classe))
 ```
   
+###4.3 Out of Sample Error
+
+The Out Of Sample Error is given by 100% - `r 100*acc1`% = `r 100 - 100*acc1`%. The model is thus properly performing on the test set.
   
-###4.3 Predicting on the Test Set
+  
+###4.4 Predicting on the Test Set
   
 In the last step the random forest model is used to predict on the test set (testing):
   
