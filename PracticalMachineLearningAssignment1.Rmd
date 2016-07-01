@@ -1,0 +1,225 @@
+---
+title: "Practical Machine Learning - Course Project"
+author: "HR"
+date: "01. July 2016"
+output: html_document
+---
+  
+  
+###Background and Goal of this Project
+  
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+  
+The goal of this project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set.
+  
+Based on the 'training data', a model is created in order to predict the 'classe' variable. This prediction model is then used to predict 20 different test cases given in the 'test data'.
+  
+  
+###1. Data
+  
+The 'training data' for this project are available here:
+  
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+  
+The 'test data' are available here:
+  
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+  
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. 
+  
+```{r, GettingData, echo=FALSE, cache = TRUE, warning=FALSE, message=FALSE}
+fileURL_training <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+
+destfile_training = "C:/Users/User/User/Coursera/Data Science/08 - Practical Machine Learning/Assignment1/pml-training.csv"
+
+download.file(fileURL_training, destfile = destfile_training)
+
+fileURL_testing <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+destfile_testing = "C:/Users/User/User/Coursera/Data Science/08 - Practical Machine Learning/Assignment1/pml-testing.csv"
+
+download.file(fileURL_testing, destfile = destfile_testing)
+
+training <- read.csv(destfile_training)
+testing <- read.csv(destfile_testing)
+```
+  
+  
+####1.1 Partitioning the Data into a Training and a Test set
+  
+For cross-validation purposes the training data is first split into a training set and a test set:
+  
+```{r, Partitioning, warning=FALSE, message=FALSE}
+set.seed(12345)
+library("caret")
+inTrain <- createDataPartition(training$classe, p=0.7, list=FALSE)
+Training <- training[inTrain, ]
+Testing <- training[-inTrain, ]
+dim(Training)
+dim(Testing)
+``` 
+  
+  
+###2. Exploratory Data Analysis and Cleaning the Data
+  
+In the following, the dataset (Training) is exlored and cleaned up.
+  
+  
+####2.1 Checking for features containing too many NA's
+  
+The percentage of NA's is calculated for each column:
+  
+```{r, ExploratoryDataAnalysis2, warning=FALSE, message=FALSE}
+na_percent <- data.frame(sapply(Training, function(y) 
+    100*sum(is.na(y))/nrow(Training)))
+unique(na_percent)
+```
+  
+Feature columns contain either no NA's or about 98%. The latter feature columns (`r nrow(na_percent)` in total) are excluded from the dataset:
+  
+```{r, CleaningTheData, warning=FALSE, message=FALSE}
+Training <- Training[, !(na_percent > 0)]
+```
+  
+  
+####2.2 Checking for Features containing no Information
+
+In the next step the dataset is checked for columns containing only "#DIV/0!" or empty cells (""):
+  
+```{r, CleaningTheData2, warning=FALSE, message=FALSE}
+DivZero_percent <- data.frame(sapply(Training, function(y) 
+    100*sum(y == "#DIV/0!" | y == "")/nrow(Training)))
+```
+  
+All columns containing more than 97% of "#DIV/0!" or empty cells (`r nrow(DivZero_percent)` in total) are rejected:
+  
+```{r, CleaningTheData2_1, warning=FALSE, message=FALSE}
+Training <- Training[, !(DivZero_percent > 97)]
+```
+  
+  
+####2.3 Non-Predictive Features
+  
+The first five features of the dataset are a sequential number, the name of the user and time stamps:
+  
+```{r, CleaningTheData3, warning=FALSE, message=FALSE}
+names(Training[, 1:5])
+```
+  
+None of them can be used for a prediction model. So they are rejected:
+  
+```{r, CleaningTheData4, warning=FALSE, message=FALSE}
+Training <- Training[, -(1:5)]
+```
+  
+  
+####2.4 Factor Variables
+  
+Beneath the feature "classe" there is one factor variable in the dataset called "new_window":
+  
+```{r, CleaningTheData5, warning=FALSE, message=FALSE}
+names(Training[, sapply(Training, class) == "factor"])
+```
+  
+In order to answer the question, if this feature can be rejected, or not, a table of 'classe' vs. 'new_window' is plotted below. In addition, the percentage of 'yes' and 'no' is shown in the third column:
+  
+```{r, CleaningTheData6, warning=FALSE, message=FALSE}
+TableCNW <- table(Training$classe, Training$new_window)
+cbind(TableCNW, round(100*TableCNW[, 2]/TableCNW[, 1], 1))
+```
+  
+Since for all 5 groups in 'classe' the percentage is approximately the same, the feature 'new_window' is not predictive and can be rejected:
+  
+```{r, CleaningTheData7, warning=FALSE, message=FALSE}
+Training <- subset(Training, select = -new_window)
+```
+  
+  
+####2.5 Near Zero Variance
+  
+In the next step features are checked for low variance:
+  
+```{r, CleaningTheData8, warning=FALSE, message=FALSE}
+LowVariance <- nearZeroVar(Training, saveMetrics=TRUE)
+sum(LowVariance)
+```
+  
+There are no near zero variance features left in the dataset. Thus, the dataset is tidy and can be used for building up a predictive model.
+  
+`r ncol(Training)-1` features are left in the dataset.
+  
+  
+###3. Cleaning up the Test Sets
+  
+From the tests sets 'Testing' and 'testing' the same subsets of features, which are remaining in the training set, are taken:
+  
+```{r, CleaningTheData9, warning=FALSE, message=FALSE}
+Testing <- Testing[, names(Testing) %in% names(Training)]
+testing <- testing[, names(testing) %in% names(Training)]
+```
+  
+  
+###4. Predictive Modelling
+  
+First three different models are tried, from which the best is chosen based on it's accuracy (4.1). This model is then shown in detail (4.2) and finally it is used to predict on the test set 'testing' (4.3).
+  
+  
+###4.1 Model Selection
+  
+Three different types of models are tried on the test set: Random forest (rf), a classification tree (rpart) and linear discriminant analysis (lda).
+  
+```{r, measureTime3, warning=FALSE, message=FALSE}
+t3 <- Sys.time()
+``` 
+  
+```{r, ModelSelection, warning=FALSE, message=FALSE, cache = TRUE}
+mod1 <- train(classe ~., method = "rf", data = Training)
+pred1 <- predict(mod1, Testing)
+acc1 <- confusionMatrix(pred1, Testing$classe)$overall['Accuracy']
+
+mod2 <- train(classe ~., method = "rpart", data = Training)
+pred2 <- predict(mod2, Testing)
+acc2 <- confusionMatrix(pred2, Testing$classe)$overall['Accuracy']
+
+mod3 <- train(classe ~., method = "lda", data = Training)
+pred3 <- predict(mod3, Testing)
+acc3 <- confusionMatrix(pred3, Testing$classe)$overall['Accuracy']
+```
+  
+```{r, measureTime4, warning=FALSE, message=FALSE}
+t4 <- Sys.time()
+t4 - t3
+```
+  
+The following table compares the accuracy of the three models:
+  
+```{r, BestModel, warning=FALSE, message=FALSE}
+model <- rbind("rf", "rpart", "lda")
+accuracy <- round(100*rbind(acc1, acc2, acc3), 2)
+model_results <- data.frame(cbind(model, accuracy))
+colnames(model_results) <- c("model", "accuracy")
+
+print(model_results, row.names = FALSE)
+```
+  
+Since the random forest model has the best accuracy on the test set, which was taken from the training data in 1.1, it's confusion matrix is first shown in detain and it will then be used for predicting on the 'test data' (testing).
+  
+  
+###4.2 The Confusion Matrix of the Random Forest Model
+  
+The confusion matrix is shown below:
+  
+```{r, confusion, warning=FALSE, message=FALSE}
+print(confusionMatrix(pred1, Testing$classe))
+```
+  
+  
+###4.3 Predicting on the Test Set
+  
+In the last step the random forest model is used to predict on the test set (testing):
+  
+```{r, testing, warning=FALSE, message=FALSE}
+predict(mod1, testing)
+```
+
+
